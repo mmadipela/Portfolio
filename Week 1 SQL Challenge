@@ -1,0 +1,242 @@
+CREATE SCHEMA dannys_diner;
+SET search_path = dannys_diner;
+
+CREATE TABLE sales (
+  "customer_id" VARCHAR(1),
+  "order_date" DATE,
+  "product_id" INTEGER);
+
+INSERT INTO sales
+  ("customer_id", "order_date", "product_id")
+VALUES
+  ('A', '2021-01-01', '1'),
+  ('A', '2021-01-01', '2'),
+  ('A', '2021-01-07', '2'),
+  ('A', '2021-01-10', '3'),
+  ('A', '2021-01-11', '3'),
+  ('A', '2021-01-11', '3'),
+  ('B', '2021-01-01', '2'),
+  ('B', '2021-01-02', '2'),
+  ('B', '2021-01-04', '1'),
+  ('B', '2021-01-11', '1'),
+  ('B', '2021-01-16', '3'),
+  ('B', '2021-02-01', '3'),
+  ('C', '2021-01-01', '3'),
+  ('C', '2021-01-01', '3'),
+  ('C', '2021-01-07', '3');
+ 
+ 
+CREATE TABLE menu (
+  "product_id" INTEGER,
+  "product_name" VARCHAR(5),
+  "price" INTEGER);
+
+INSERT INTO menu
+  ("product_id", "product_name", "price")
+VALUES
+  ('1', 'sushi', '10'),
+  ('2', 'curry', '15'),
+  ('3', 'ramen', '12');
+  
+
+CREATE TABLE members (
+  "customer_id" VARCHAR(1),
+  "join_date" DATE);
+
+INSERT INTO members
+  ("customer_id", "join_date")
+VALUES
+  ('A', '2021-01-07'),
+  ('B', '2021-01-09');
+
+select * from members
+
+
+  
+  -- 1. What is the total amount each customer spent at the restaurant?
+  select sales.customer_id as Customer_ID, sum(menu.price) as TotalSpent
+  from sales
+  join menu
+  on menu.product_id = sales.product_id
+  group by sales.customer_id
+  
+  --2. How many days has each customer visited the restaurant?
+  select sales.customer_id as Customer_ID, count(*) CustomerVisits
+  from sales
+  group by sales.customer_id
+
+
+  --3. What was the first item from the menu purchased by each customer?
+  With CTE_Ranking as
+  (select customer_id, min(order_date) orderdate_, product_id, 
+   DENSE_RANK() over(partition by customer_id order by product_id) Ranking
+  from sales
+  group by customer_id, product_id)
+  Select * from CTE_Ranking
+  where ranking = 1
+  
+ 
+  
+  --4. What is the most purchased item on the menu and how many times was it purchased by all customers?
+  select menu.product_name, sales.product_id, sum (sales.product_id) TotalBought
+  from sales
+  join menu
+  on menu.product_id = sales.product_id
+  group by sales.product_id, menu.product_name
+  order by Totalbought desc
+  --ramen
+
+ -- 5.Which item was the most popular for each customer
+
+  with popular_per_customer 
+  as
+
+  (select s.customer_id , sum (s.product_id) Product, m.product_name, DENSE_RANK() over(partition by customer_id order by s.product_id desc) Ranking
+  from sales s
+  left join menu m
+  on s.product_id= m.product_id
+  group by s.customer_id,  m.product_name, s.product_id)
+
+  select *
+  from popular_per_customer
+  where ranking = 1
+ 
+ --6. Which item was purchased first by the customer after they became a member?
+  select * from sales
+  select * from members
+
+  With first_sale_after_membership as
+
+  (select  m.customer_id, m.join_date JoinedDate, s.order_date, 
+  DENSE_RANK () over(partition by m.customer_id order by s.order_Date) ranking
+  from members m 
+  left join sales s
+  on m.customer_id = s.customer_id
+  group by m.customer_id, m.join_date, s.order_date
+  having m.join_date <= s.order_date) 
+
+  select * from first_sale_after_membership
+  where ranking = 1
+ 
+ --7 Which item was purchased just before the customer became a member?
+
+  select * from sales
+  select * from members
+  select * from menu
+
+
+  select  m.customer_id, m.join_date JoinedDate, s.order_date, s.product_id, mu.product_name
+  from members m 
+  left join sales s
+  on m.customer_id = s.customer_id
+  left join menu mu
+  on s.product_id = mu.product_id
+  group by m.customer_id, m.join_date, s.order_date, s.product_id, mu.product_name
+  having m.join_date > s.order_date
+ 
+--8 What is the total items and amount spent for each member before they became a member?
+
+  select  m.customer_id, m.join_date JoinedDate, s.order_date, s.product_id, mu.product_name, count (*), mu.price
+  from members m 
+  left join sales s
+  on m.customer_id = s.customer_id
+  left join menu mu
+  on s.product_id = mu.product_id
+  group by m.customer_id, m.join_date, s.order_date, s.product_id, mu.product_name, mu.price
+  having m.join_date > s.order_date
+
+
+ -- if each $1 spent equates to 10 points and sushi has a 2x points multiplier - how many points would each customer have
+
+ select * from Customer_rewards
+ 
+ ALTER TABLE members
+ drop column points;
+
+ with Customer_rewards
+ as
+ (select s.product_id, s.customer_id, s.order_date, m.price
+ from sales s
+ left join menu m
+ on s.product_id = m.product_id)
+
+select * from Customer_rewards
+ 
+ create table Customer_rewards
+ ("Customer_ID" varchar(10),
+ "Order_Date" date,
+ "Product_ID" varchar(10))
+
+ Alter table customer_rewards
+ add Product_name text;
+
+ Alter table customer_rewards
+ add Price int;
+
+ Alter table customer_rewards
+ add points int;
+
+ INSERT INTO Customer_rewards (Customer_ID, Order_date, Product_ID)
+ select customer_id, order_date, product_id from sales
+
+
+  update Customer_rewards
+  set Product_name = 'sushi'
+  where product_id = 1
+
+  update Customer_rewards
+  set Product_name = 'curry'
+  where product_id = 2
+
+  update Customer_rewards
+  set Product_name = 'ramen'
+  where product_id = 3
+
+  update Customer_rewards
+  set Price = 10
+  where product_id = 1
+
+  update Customer_rewards
+  set Price = 15
+  where product_id = 2
+
+  update Customer_rewards
+  set Price = 12
+  where product_id = 3
+
+  update Customer_rewards
+  set Points = (price*10)
+  where product_id = 2
+
+  update Customer_rewards
+  set Points = (price*10)
+  where product_id = 3
+
+  update Customer_rewards
+  set Points = 2*(price*10)
+  where product_id = 1
+
+ -- Final answer
+  select customer_id, sum(points) Total_Points
+  from customer_rewards
+  group by customer_id
+
+-- 10 A customer joins the program (including their join date) they earn 2x points on all items, not just sushi - how many points do customer A and B have at the end of January
+ Alter table customer_rewards
+ add Join_date date
+
+ update Customer_rewards
+ set Join_date = '2021-01-07'
+ where customer_id = 'A'
+
+  update Customer_rewards
+ set Join_date = '2021-01-09'
+ where customer_id = 'B'
+
+ select * from Customer_rewards
+
+ --final answer
+ select customer_id, sum(2*points), Join_date
+ from Customer_rewards
+ where Join_date < '2021-01-30'
+ group by customer_id, join_date
